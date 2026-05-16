@@ -1,7 +1,7 @@
 import { SectionHeader } from "@/components/section-header";
 import { MarketStatCard } from "@/components/market-stat-card";
-import { StockCard } from "@/components/stock-card";
 import { FadeIn } from "@/components/fade-in";
+import { DashboardTabs } from "@/components/dashboard-tabs";
 import { Nifty50WeightageTable } from "@/components/nifty50-weightage-table";
 import { NIFTY50_STOCKS } from "@/data/nifty50";
 import { scanMarket } from "@/services/analysis";
@@ -41,53 +41,22 @@ export default async function HomePage() {
           </section>
         </FadeIn>
 
-        <FadeIn delay={0.1}>
-          <section>
-            <SectionHeader title="Nifty 50 by Weightage" subtitle="Ranked constituents with direct watchlist add" />
-            <Nifty50WeightageTable />
-          </section>
-        </FadeIn>
-
         <FadeIn delay={0.15}>
           <section>
-            <SectionHeader title="Swing Trade Candidates" subtitle="Top setups by swing score" />
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {scan.swingCandidates.map((stock) => (
-                <StockCard key={stock.quote.symbol} stock={stock} />
-              ))}
-            </div>
+            <SectionHeader title="Actionable Setups" subtitle="Switch between clean buy-side views" />
+            <DashboardTabs
+              swingCandidates={scan.swingCandidates}
+              momentumStocks={scan.momentumStocks}
+              volumeBreakouts={scan.volumeBreakouts}
+              topGainers={scan.topGainers}
+            />
           </section>
         </FadeIn>
 
         <FadeIn delay={0.2}>
-          <section className="grid gap-6 lg:grid-cols-2">
-            <div>
-              <SectionHeader title="Top Gainers" subtitle="Highest daily momentum" />
-              <div className="grid gap-4">
-                {scan.topGainers.map((stock) => (
-                  <StockCard key={`gainer-${stock.quote.symbol}`} stock={stock} />
-                ))}
-              </div>
-            </div>
-            <div>
-              <SectionHeader title="Top Losers" subtitle="Mean-reversion watch" />
-              <div className="grid gap-4">
-                {scan.topLosers.map((stock) => (
-                  <StockCard key={`loser-${stock.quote.symbol}`} stock={stock} />
-                ))}
-              </div>
-            </div>
-          </section>
-        </FadeIn>
-
-        <FadeIn delay={0.25}>
           <section>
-            <SectionHeader title="Momentum Stocks" subtitle="Uptrend + strong technical score" />
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {scan.momentumStocks.map((stock) => (
-                <StockCard key={`momentum-${stock.quote.symbol}`} stock={stock} />
-              ))}
-            </div>
+            <SectionHeader title="Nifty 50 by Weightage" subtitle="Directly add symbols to watchlist" />
+            <Nifty50WeightageTable />
           </section>
         </FadeIn>
       </div>
@@ -104,7 +73,7 @@ export default async function HomePage() {
         </div>
 
         <section>
-          <SectionHeader title="Nifty 50 by Weightage" subtitle="Ranked constituents with direct watchlist add" />
+          <SectionHeader title="Nifty 50 by Weightage" subtitle="Directly add symbols to watchlist" />
           <Nifty50WeightageTable />
         </section>
       </div>

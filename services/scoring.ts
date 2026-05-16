@@ -109,19 +109,31 @@ export function buildSwingSetup(input: {
 }): SwingSetup {
   const { quote, technicals, fundamentalScore, earningsScore, technicalScore, reasons } = input;
 
+  const hasContextualFundamentals = fundamentalScore > 0 || earningsScore > 0;
+  const bullishTrendFilter =
+    technicals.trend === "uptrend" &&
+    technicals.ema20 > technicals.ema50 &&
+    quote.price > technicals.ema20;
+
   const swingTradeScore = clamp(
-    technicalScore * 0.5 + fundamentalScore * 0.25 + earningsScore * 0.25
+    hasContextualFundamentals
+      ? technicalScore * 0.65 + fundamentalScore * 0.2 + earningsScore * 0.15
+      : technicalScore
   );
 
   let recommendation: Recommendation = "Avoid";
-  if (swingTradeScore >= 75) recommendation = "Strong Swing Buy";
-  else if (swingTradeScore >= 50) recommendation = "Watchlist";
+  if (bullishTrendFilter && swingTradeScore >= 70) recommendation = "Strong Swing Buy";
+  else if (bullishTrendFilter && swingTradeScore >= 55) recommendation = "Watchlist";
 
   const entryPrice = quote.price;
   const stopLoss = Math.max(technicals.support * 0.99, entryPrice * 0.94);
   const risk = entryPrice - stopLoss;
   const target1 = entryPrice + risk * 1.5;
   const target2 = entryPrice + risk * 2.5;
+
+  if (bullishTrendFilter) reasons.unshift("Bullish trend filter passed");
+  else reasons.unshift("Rejected by bullish trend filter");
+  if (!hasContextualFundamentals) reasons.push("Technical-only mode: fundamentals unavailable");
 
   return {
     swingTradeScore,

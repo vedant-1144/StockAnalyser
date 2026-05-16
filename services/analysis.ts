@@ -80,17 +80,27 @@ export async function scanMarket(symbols: string[] = [...DEFAULT_SCAN_SYMBOLS]):
   const topLosers = [...all].sort((a, b) => a.quote.changePercent - b.quote.changePercent).slice(0, 5);
 
   const swingCandidates = [...all]
-    .filter((stock) => stock.swing.recommendation !== "Avoid")
+    .filter(
+      (stock) =>
+        stock.swing.recommendation !== "Avoid" &&
+        stock.technicals.trend === "uptrend" &&
+        stock.quote.price > stock.technicals.ema20
+    )
     .sort((a, b) => b.swing.swingTradeScore - a.swing.swingTradeScore)
     .slice(0, 8);
 
   const volumeBreakouts = [...all]
-    .filter((stock) => stock.technicals.volumeBreakout)
+    .filter((stock) => stock.technicals.volumeBreakout && stock.swing.recommendation !== "Avoid")
     .sort((a, b) => b.quote.changePercent - a.quote.changePercent)
     .slice(0, 8);
 
   const momentumStocks = [...all]
-    .filter((stock) => stock.technicals.trend === "uptrend" && stock.technicals.rsi >= 52)
+    .filter(
+      (stock) =>
+        stock.technicals.trend === "uptrend" &&
+        stock.technicals.rsi >= 52 &&
+        stock.swing.recommendation !== "Avoid"
+    )
     .sort((a, b) => b.swing.technicalScore - a.swing.technicalScore)
     .slice(0, 8);
 

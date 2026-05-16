@@ -3,7 +3,6 @@ import { OpenTradingViewButton } from "@/components/open-tradingview-button";
 import { PriceHistoryChart } from "@/components/price-history-chart";
 import { RecommendationBadge } from "@/components/recommendation-badge";
 import { SectionHeader } from "@/components/section-header";
-import { TradingViewEmbed } from "@/components/trading-view-embed";
 import { analyzeStock } from "@/services/analysis";
 import { formatCompactINR, formatINR, formatNumber, formatPercent } from "@/utils/format";
 import { normalizeInputSymbol } from "@/utils/symbols";
@@ -97,11 +96,6 @@ export default async function StockDetailsPage({ params }: StockDetailsPageProps
               ))}
             </ul>
           </div>
-        </section>
-
-        <section>
-          <SectionHeader title="Technical Chart" subtitle="TradingView widget" />
-          <TradingViewEmbed symbol={stock.quote.symbol} />
         </section>
 
         <section>

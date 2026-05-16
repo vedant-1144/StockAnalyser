@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { WatchlistItem } from "@/types/stock";
 import { OpenTradingViewButton } from "@/components/open-tradingview-button";
 
 export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
-  const [symbol, setSymbol] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,34 +36,6 @@ export default function WatchlistPage() {
     void load();
   }, []);
 
-  const canSubmit = useMemo(() => symbol.trim().length > 0 && !saving, [symbol, saving]);
-
-  const add = async () => {
-    if (!canSubmit) return;
-    setSaving(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/watchlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ symbol })
-      });
-
-      if (!response.ok) {
-        const body = (await response.json()) as { error?: string };
-        throw new Error(body.error || "Failed to add symbol");
-      }
-
-      setSymbol("");
-      await load();
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const remove = async (target: string) => {
     setSaving(true);
     setError(null);
@@ -92,34 +63,8 @@ export default function WatchlistPage() {
       <section>
         <h2 className="heading-gradient text-3xl font-bold tracking-tight sm:text-4xl">Watchlist</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Save swing-trade symbols and jump directly into detail analysis or TradingView charts.
+          Added symbols are listed below for quick analysis or removal.
         </p>
-      </section>
-
-      <section className="glass-card p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <label htmlFor="symbol" className="mb-1 block text-sm text-muted-foreground">
-              NSE Symbol
-            </label>
-            <input
-              id="symbol"
-              value={symbol}
-              onChange={(event) => setSymbol(event.target.value.toUpperCase())}
-              placeholder="RELIANCE"
-              className="w-full rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm outline-none ring-primary transition focus:ring-2"
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!canSubmit}
-            onClick={add}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary/20 px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary/30 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Plus className="h-4 w-4" />
-            Add to Watchlist
-          </button>
-        </div>
       </section>
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
