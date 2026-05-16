@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/watchlist", label: "Watchlist", icon: BookMarked }
-];
+] as const;
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
