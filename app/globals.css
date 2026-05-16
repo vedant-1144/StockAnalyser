@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 215 30% 9%;
+  --foreground: 215 15% 94%;
+  --card: 218 28% 13%;
+  --card-foreground: 215 18% 92%;
+  --muted: 215 20% 17%;
+  --muted-foreground: 215 10% 70%;
+  --border: 218 25% 23%;
+  --primary: 209 90% 64%;
+  --success: 142 70% 48%;
+  --danger: 0 78% 60%;
+}
+
+* {
+  @apply border-border;
+}
+
+html,
+body {
+  @apply bg-background text-foreground;
+}
+
+body {
+  min-height: 100vh;
+  background-image:
+    radial-gradient(circle at 10% 10%, rgba(52, 131, 250, 0.18), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(39, 174, 96, 0.12), transparent 25%),
+    linear-gradient(165deg, rgba(12, 16, 26, 0.92), rgba(8, 11, 18, 1));
+}
+
+::selection {
+  background: rgba(74, 144, 226, 0.35);
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-2xl border border-border/70 bg-card/80 backdrop-blur-md;
+  }
+
+  .heading-gradient {
+    background: linear-gradient(100deg, #c8dbff 0%, #6fb0ff 45%, #7af4bd 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
