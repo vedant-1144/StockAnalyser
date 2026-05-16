@@ -1,6 +1,6 @@
 import { appCache } from "@/lib/cache";
 import type { MarketScan, StockAnalysis } from "@/types/stock";
-import { DEFAULT_SCAN_SYMBOLS } from "@/utils/symbols";
+import { DEFAULT_SCAN_SYMBOLS, normalizeInputSymbol } from "@/utils/symbols";
 import { buildSwingSetup, calculateEarningsScore, calculateFundamentalScore, calculateTechnicalScore } from "./scoring";
 import { upsertStockScore } from "./stock-scores";
 import { calculateTechnicals } from "./technical";
@@ -10,7 +10,7 @@ const STOCK_CACHE_TTL = 10 * 60 * 1000;
 const SCAN_CACHE_TTL = 5 * 60 * 1000;
 
 function normalizeSymbol(symbol: string): string {
-  return symbol.replace(".NS", "").replace(".BO", "").trim().toUpperCase();
+  return normalizeInputSymbol(symbol);
 }
 
 export async function analyzeStock(symbol: string): Promise<StockAnalysis> {

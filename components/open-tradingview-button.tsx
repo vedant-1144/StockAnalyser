@@ -12,7 +12,8 @@ export function OpenTradingViewButton({ symbol, className }: OpenTradingViewButt
   return (
     <Button
       onClick={() => {
-        window.open(`https://www.tradingview.com/chart/?symbol=NSE:${symbol.toUpperCase()}`, "_blank", "noopener,noreferrer");
+        const tradingViewSymbol = encodeURIComponent(`NSE:${symbol.toUpperCase()}`);
+        window.open(`https://www.tradingview.com/chart/?symbol=${tradingViewSymbol}`, "_blank", "noopener,noreferrer");
       }}
       className={className}
     >

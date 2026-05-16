@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { OpenTradingViewButton } from "@/components/open-tradingview-button";
 import { PriceHistoryChart } from "@/components/price-history-chart";
 import { RecommendationBadge } from "@/components/recommendation-badge";
@@ -7,6 +6,7 @@ import { SectionHeader } from "@/components/section-header";
 import { TradingViewEmbed } from "@/components/trading-view-embed";
 import { analyzeStock } from "@/services/analysis";
 import { formatCompactINR, formatINR, formatNumber, formatPercent } from "@/utils/format";
+import { normalizeInputSymbol } from "@/utils/symbols";
 
 const rowClass = "grid grid-cols-2 border-b border-border/50 py-2 text-sm";
 
@@ -18,9 +18,10 @@ export const revalidate = 300;
 
 export default async function StockDetailsPage({ params }: StockDetailsPageProps) {
   const { symbol } = await params;
+  const normalizedSymbol = normalizeInputSymbol(symbol);
 
   try {
-    const stock = await analyzeStock(symbol);
+    const stock = await analyzeStock(normalizedSymbol);
 
     return (
       <div className="space-y-8">
@@ -138,7 +139,31 @@ export default async function StockDetailsPage({ params }: StockDetailsPageProps
         </section>
       </div>
     );
-  } catch {
-    notFound();
+  } catch (error) {
+    console.error(`Failed to analyze stock ${normalizedSymbol}`, error);
+
+    return (
+      <div className="space-y-6">
+        <section className="glass-card p-6">
+          <p className="text-sm uppercase tracking-widest text-muted-foreground">{normalizedSymbol}</p>
+          <h2 className="mt-2 text-2xl font-semibold text-foreground">Analysis unavailable</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            The stock symbol was found in your app, but the live Yahoo Finance analysis request failed. This can happen when Yahoo is slow, rate-limited, or the symbol mapping is temporarily unavailable.
+          </p>
+          <p className="mt-3 rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
+            {error instanceof Error ? error.message : "Unknown stock analysis error"}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              href="/"
+              className="rounded-lg border border-border/80 bg-muted/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted"
+            >
+              Back to Dashboard
+            </Link>
+            <OpenTradingViewButton symbol={normalizedSymbol} />
+          </div>
+        </section>
+      </div>
+    );
   }
 }

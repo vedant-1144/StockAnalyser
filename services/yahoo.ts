@@ -1,4 +1,3 @@
-import yahooFinance from "yahoo-finance2";
 import type { FundamentalMetrics, MarketOverview, QuarterlyMetrics, QuoteSnapshot } from "@/types/stock";
 import { percentDelta, safeNumber } from "@/utils/math";
 import { toNseTicker } from "@/utils/symbols";
@@ -6,6 +5,61 @@ import { toNseTicker } from "@/utils/symbols";
 interface SummaryNumeric {
   raw?: number;
   fmt?: string;
+}
+
+interface YahooChartResult {
+  meta?: {
+    symbol?: string;
+    shortName?: string;
+    longName?: string;
+    regularMarketPrice?: number;
+    chartPreviousClose?: number;
+    previousClose?: number;
+    regularMarketDayHigh?: number;
+    regularMarketDayLow?: number;
+  };
+  timestamp?: number[];
+  indicators?: {
+    quote?: Array<{
+      close?: Array<number | null>;
+      low?: Array<number | null>;
+      high?: Array<number | null>;
+      volume?: Array<number | null>;
+    }>;
+  };
+}
+
+async function fetchYahooJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/json",
+      "user-agent": "Mozilla/5.0 StockAnalyser/1.0"
+    },
+    next: { revalidate: 300 }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Yahoo request failed (${response.status}) for ${url}`);
+  }
+
+  return (await response.json()) as T;
+}
+
+async function fetchYahooChart(ticker: string, range: string): Promise<YahooChartResult> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?range=${range}&interval=1d`;
+  const response = await fetchYahooJson<any>(url);
+  const error = response.chart?.error;
+
+  if (error) {
+    throw new Error(error.description ?? `Yahoo chart request failed for ${ticker}`);
+  }
+
+  const result = response.chart?.result?.[0];
+  if (!result) {
+    throw new Error(`No Yahoo chart data found for ${ticker}`);
+  }
+
+  return result;
 }
 
 function numericFromUnknown(value: unknown, fallback = 0): number {
@@ -25,20 +79,35 @@ function normalizePercent(value: number): number {
 
 export async function fetchQuoteSnapshot(symbol: string): Promise<QuoteSnapshot> {
   const ticker = toNseTicker(symbol);
-  const quote = await yahooFinance.quote(ticker);
+  const result = await fetchYahooChart(ticker, "5d");
+  const meta = result.meta ?? {};
+  const quote = result.indicators?.quote?.[0] ?? {};
+  const closes = quote.close ?? [];
+  const highs = quote.high ?? [];
+  const lows = quote.low ?? [];
+  const volumes = quote.volume ?? [];
+
+  const latestClose = [...closes].reverse().find((value) => typeof value === "number") ?? 0;
+  const previousClose =
+    safeNumber(meta.previousClose) ||
+    safeNumber(meta.chartPreviousClose) ||
+    safeNumber(closes.at(-2));
+  const price = safeNumber(meta.regularMarketPrice) || safeNumber(latestClose);
+  const change = price - previousClose;
+  const changePercent = previousClose ? (change / previousClose) * 100 : 0;
 
   return {
     symbol: symbol.toUpperCase(),
     exchangeSymbol: ticker,
-    shortName: quote.shortName ?? quote.longName ?? symbol.toUpperCase(),
-    price: safeNumber(quote.regularMarketPrice),
-    change: safeNumber(quote.regularMarketChange),
-    changePercent: safeNumber(quote.regularMarketChangePercent),
-    volume: safeNumber(quote.regularMarketVolume),
-    marketCap: safeNumber(quote.marketCap),
-    previousClose: safeNumber(quote.regularMarketPreviousClose),
-    dayHigh: safeNumber(quote.regularMarketDayHigh),
-    dayLow: safeNumber(quote.regularMarketDayLow)
+    shortName: meta.shortName ?? meta.longName ?? symbol.toUpperCase(),
+    price,
+    change,
+    changePercent,
+    volume: safeNumber(volumes.at(-1)),
+    marketCap: 0,
+    previousClose,
+    dayHigh: safeNumber(meta.regularMarketDayHigh) || safeNumber(highs.at(-1)),
+    dayLow: safeNumber(meta.regularMarketDayLow) || safeNumber(lows.at(-1))
   };
 }
 
@@ -51,15 +120,16 @@ export async function fetchFundamentalsAndQuarterly(
   let summary: any = {};
 
   try {
-    summary = (await yahooFinance.quoteSummary(ticker, {
-      modules: [
-        "defaultKeyStatistics",
-        "financialData",
-        "incomeStatementHistoryQuarterly",
-        "earnings",
-        "summaryDetail"
-      ]
-    })) as any;
+    const modules = [
+      "defaultKeyStatistics",
+      "financialData",
+      "incomeStatementHistoryQuarterly",
+      "earnings",
+      "summaryDetail"
+    ].join(",");
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}`;
+    const response = await fetchYahooJson<any>(url);
+    summary = response.quoteSummary?.result?.[0] ?? {};
   } catch {
     summary = {};
   }
@@ -119,17 +189,18 @@ export async function fetchFundamentalsAndQuarterly(
 export async function fetchHistoricalSeries(symbol: string): Promise<any[]> {
   const ticker = toNseTicker(symbol);
 
-  const end = new Date();
-  const start = new Date();
-  start.setFullYear(end.getFullYear() - 1);
-
   try {
-    const history = await yahooFinance.historical(ticker, {
-      period1: start,
-      period2: end,
-      interval: "1d"
-    });
-    return history;
+    const result = await fetchYahooChart(ticker, "1y");
+    const timestamps: number[] = result?.timestamp ?? [];
+    const quote = result?.indicators?.quote?.[0] ?? {};
+
+    return timestamps.map((timestamp, index) => ({
+      date: new Date(timestamp * 1000),
+      close: quote.close?.[index] ?? null,
+      low: quote.low?.[index] ?? null,
+      high: quote.high?.[index] ?? null,
+      volume: quote.volume?.[index] ?? null
+    }));
   } catch {
     return [];
   }
@@ -137,9 +208,17 @@ export async function fetchHistoricalSeries(symbol: string): Promise<any[]> {
 
 export async function fetchNiftyOverview(): Promise<MarketOverview> {
   try {
-    const nifty = await yahooFinance.quote("^NSEI");
-    const niftyPrice = safeNumber(nifty.regularMarketPrice);
-    const niftyChangePercent = safeNumber(nifty.regularMarketChangePercent);
+    const result = await fetchYahooChart("^NSEI", "5d");
+    const meta = result.meta ?? {};
+    const quote = result.indicators?.quote?.[0] ?? {};
+    const closes = quote.close ?? [];
+    const latestClose = [...closes].reverse().find((value) => typeof value === "number") ?? 0;
+    const previousClose =
+      safeNumber(meta.previousClose) ||
+      safeNumber(meta.chartPreviousClose) ||
+      safeNumber(closes.at(-2));
+    const niftyPrice = safeNumber(meta.regularMarketPrice) || safeNumber(latestClose);
+    const niftyChangePercent = previousClose ? ((niftyPrice - previousClose) / previousClose) * 100 : 0;
 
     let trend: MarketOverview["trend"] = "Neutral";
     if (niftyChangePercent > 0.6) trend = "Bullish";

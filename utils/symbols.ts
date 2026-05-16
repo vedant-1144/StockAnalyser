@@ -21,8 +21,20 @@ export const DEFAULT_SCAN_SYMBOLS = [
   "NTPC"
 ] as const;
 
+export function normalizeInputSymbol(symbol: string): string {
+  let decoded = symbol;
+
+  try {
+    decoded = decodeURIComponent(symbol);
+  } catch {
+    decoded = symbol;
+  }
+
+  return decoded.replace(".NS", "").replace(".BO", "").trim().toUpperCase();
+}
+
 export function toNseTicker(symbol: string): string {
-  const cleaned = symbol.trim().toUpperCase();
+  const cleaned = normalizeInputSymbol(symbol);
   if (cleaned.includes(".")) return cleaned;
   return `${cleaned}.NS`;
 }

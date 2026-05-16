@@ -15,12 +15,14 @@ async function ensureUserId(): Promise<string> {
   const email = process.env.WATCHLIST_USER_EMAIL || "trader@example.com";
 
   const existing = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (existing.error) throw existing.error;
   if (existing.data?.id) return existing.data.id;
 
   const created = await supabase.from("users").insert({ email }).select("id").single();
+  if (created.error) throw created.error;
   if (created.data?.id) return created.data.id;
 
-  return fallbackUserId;
+  throw new Error("Unable to create watchlist user");
 }
 
 export async function listWatchlist(): Promise<WatchlistItem[]> {
@@ -28,25 +30,23 @@ export async function listWatchlist(): Promise<WatchlistItem[]> {
     return [...inMemoryWatchlist.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
   }
 
-  try {
-    const userId = await ensureUserId();
-    const { data } = await supabase
-      .from("watchlist")
-      .select("id,user_id,symbol,created_at")
-      .eq("user_id", userId)
-      .order("symbol", { ascending: true });
+  const userId = await ensureUserId();
+  const { data, error } = await supabase
+    .from("watchlist")
+    .select("id,user_id,symbol,created_at")
+    .eq("user_id", userId)
+    .order("symbol", { ascending: true });
 
-    return (
-      data?.map((row) => ({
-        id: String(row.id),
-        user_id: row.user_id,
-        symbol: normalizedSymbol(row.symbol),
-        created_at: row.created_at
-      })) ?? []
-    );
-  } catch {
-    return [...inMemoryWatchlist.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
-  }
+  if (error) throw error;
+
+  return (
+    data?.map((row) => ({
+      id: String(row.id),
+      user_id: row.user_id,
+      symbol: normalizedSymbol(row.symbol),
+      created_at: row.created_at
+    })) ?? []
+  );
 }
 
 export async function addWatchlistSymbol(symbol: string): Promise<WatchlistItem> {
@@ -63,51 +63,41 @@ export async function addWatchlistSymbol(symbol: string): Promise<WatchlistItem>
     return item;
   }
 
-  try {
-    const userId = await ensureUserId();
+  const userId = await ensureUserId();
 
-    const existing = await supabase
-      .from("watchlist")
-      .select("id,user_id,symbol,created_at")
-      .eq("user_id", userId)
-      .eq("symbol", normalized)
-      .maybeSingle();
+  const existing = await supabase
+    .from("watchlist")
+    .select("id,user_id,symbol,created_at")
+    .eq("user_id", userId)
+    .eq("symbol", normalized)
+    .maybeSingle();
 
-    if (existing.data) {
-      return {
-        id: String(existing.data.id),
-        user_id: existing.data.user_id,
-        symbol: normalizedSymbol(existing.data.symbol),
-        created_at: existing.data.created_at
-      };
-    }
+  if (existing.error) throw existing.error;
 
-    const inserted = await supabase
-      .from("watchlist")
-      .insert({ user_id: userId, symbol: normalized })
-      .select("id,user_id,symbol,created_at")
-      .single();
-
-    if (inserted.data) {
-      return {
-        id: String(inserted.data.id),
-        user_id: inserted.data.user_id,
-        symbol: normalizedSymbol(inserted.data.symbol),
-        created_at: inserted.data.created_at
-      };
-    }
-  } catch {
-    // Fallback is handled below.
+  if (existing.data) {
+    return {
+      id: String(existing.data.id),
+      user_id: existing.data.user_id,
+      symbol: normalizedSymbol(existing.data.symbol),
+      created_at: existing.data.created_at
+    };
   }
 
-  const fallback = inMemoryWatchlist.get(normalized) ?? {
-    id: randomUUID(),
-    symbol: normalized,
-    user_id: fallbackUserId,
-    created_at: new Date().toISOString()
+  const inserted = await supabase
+    .from("watchlist")
+    .insert({ user_id: userId, symbol: normalized })
+    .select("id,user_id,symbol,created_at")
+    .single();
+
+  if (inserted.error) throw inserted.error;
+  if (!inserted.data) throw new Error("Watchlist insert returned no data");
+
+  return {
+    id: String(inserted.data.id),
+    user_id: inserted.data.user_id,
+    symbol: normalizedSymbol(inserted.data.symbol),
+    created_at: inserted.data.created_at
   };
-  inMemoryWatchlist.set(normalized, fallback);
-  return fallback;
 }
 
 export async function removeWatchlistSymbol(symbol: string): Promise<void> {
@@ -117,10 +107,7 @@ export async function removeWatchlistSymbol(symbol: string): Promise<void> {
 
   if (!supabase) return;
 
-  try {
-    const userId = await ensureUserId();
-    await supabase.from("watchlist").delete().eq("user_id", userId).eq("symbol", normalized);
-  } catch {
-    // Keep local deletion and continue.
-  }
+  const userId = await ensureUserId();
+  const { error } = await supabase.from("watchlist").delete().eq("user_id", userId).eq("symbol", normalized);
+  if (error) throw error;
 }

@@ -19,6 +19,11 @@ export default function WatchlistPage() {
 
     try {
       const response = await fetch("/api/watchlist", { cache: "no-store" });
+      if (!response.ok) {
+        const body = (await response.json()) as { message?: string; error?: string };
+        throw new Error(body.message || body.error || "Failed to load watchlist");
+      }
+
       const json = (await response.json()) as { items: WatchlistItem[] };
       setItems(json.items ?? []);
     } catch (err) {
@@ -135,7 +140,7 @@ export default function WatchlistPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href={`/stocks/${item.symbol}`}
+                href={`/stocks/${encodeURIComponent(item.symbol)}`}
                 className="rounded-lg border border-border/80 bg-muted/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted"
               >
                 Analyze
