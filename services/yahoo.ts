@@ -7,6 +7,12 @@ interface SummaryNumeric {
   fmt?: string;
 }
 
+interface YahooSession {
+  cookie: string;
+  crumb: string;
+  expiresAt: number;
+}
+
 interface YahooChartResult {
   meta?: {
     symbol?: string;
@@ -29,20 +35,108 @@ interface YahooChartResult {
   };
 }
 
-async function fetchYahooJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, {
-    headers: {
-      accept: "application/json",
-      "user-agent": "Mozilla/5.0 StockAnalyser/1.0"
-    },
-    next: { revalidate: 300 }
-  });
+const yahooUserAgent =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 
-  if (!response.ok) {
-    throw new Error(`Yahoo request failed (${response.status}) for ${url}`);
+let yahooSessionCache: YahooSession | null = null;
+
+function withCrumb(url: string, crumb: string): string {
+  const urlObj = new URL(url);
+  if (!urlObj.searchParams.has("crumb")) {
+    urlObj.searchParams.set("crumb", crumb);
+  }
+  return urlObj.toString();
+}
+
+async function getYahooSession(forceRefresh = false): Promise<YahooSession> {
+  if (!forceRefresh && yahooSessionCache && yahooSessionCache.expiresAt > Date.now()) {
+    return yahooSessionCache;
   }
 
-  return (await response.json()) as T;
+  const cookieResponse = await fetch("https://fc.yahoo.com", {
+    headers: {
+      accept: "*/*",
+      "user-agent": yahooUserAgent
+    },
+    cache: "no-store",
+    redirect: "manual"
+  });
+
+  const setCookie = cookieResponse.headers.get("set-cookie");
+  const cookie = setCookie?.split(";")[0]?.trim();
+
+  if (!cookie) {
+    throw new Error("Unable to initialize Yahoo cookie session");
+  }
+
+  const crumbResponse = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
+    headers: {
+      accept: "text/plain",
+      cookie,
+      "user-agent": yahooUserAgent
+    },
+    cache: "no-store"
+  });
+
+  if (!crumbResponse.ok) {
+    throw new Error(`Unable to fetch Yahoo crumb (${crumbResponse.status})`);
+  }
+
+  const crumb = (await crumbResponse.text()).trim();
+  if (!crumb) {
+    throw new Error("Yahoo crumb was empty");
+  }
+
+  yahooSessionCache = {
+    cookie,
+    crumb,
+    expiresAt: Date.now() + 30 * 60 * 1000
+  };
+
+  return yahooSessionCache;
+}
+
+async function fetchYahooJson<T>(url: string, requiresAuth = false): Promise<T> {
+  const maxAttempts = requiresAuth ? 2 : 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let requestUrl = url;
+    const headers: Record<string, string> = {
+      accept: "application/json",
+      "user-agent": yahooUserAgent
+    };
+
+    if (requiresAuth) {
+      const session = await getYahooSession(attempt > 0);
+      requestUrl = withCrumb(url, session.crumb);
+      headers.cookie = session.cookie;
+    }
+
+    const response = await fetch(requestUrl, {
+      headers,
+      next: { revalidate: 300 }
+    });
+
+    if (response.ok) {
+      return (await response.json()) as T;
+    }
+
+    const responseBody = await response.text();
+    const canRetryWithFreshSession =
+      requiresAuth &&
+      attempt === 0 &&
+      (response.status === 401 ||
+        responseBody.toLowerCase().includes("invalid crumb") ||
+        responseBody.toLowerCase().includes("invalid cookie"));
+
+    if (canRetryWithFreshSession) {
+      continue;
+    }
+
+    throw new Error(`Yahoo request failed (${response.status}) for ${requestUrl}`);
+  }
+
+  throw new Error(`Yahoo request failed for ${url}`);
 }
 
 async function fetchYahooChart(ticker: string, range: string): Promise<YahooChartResult> {
@@ -128,9 +222,10 @@ export async function fetchFundamentalsAndQuarterly(
       "summaryDetail"
     ].join(",");
     const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=${modules}`;
-    const response = await fetchYahooJson<any>(url);
+    const response = await fetchYahooJson<any>(url, true);
     summary = response.quoteSummary?.result?.[0] ?? {};
-  } catch {
+  } catch (error) {
+    console.error(`Failed to fetch quoteSummary for ${ticker}`, error);
     summary = {};
   }
 
@@ -173,7 +268,10 @@ export async function fetchFundamentalsAndQuarterly(
     debtToEquity: numericFromUnknown(financialData.debtToEquity),
     revenueGrowth,
     profitGrowth,
-    marketCap
+    marketCap:
+      numericFromUnknown(summaryDetail.marketCap) ||
+      numericFromUnknown(financialData.marketCap) ||
+      marketCap
   };
 
   const quarterly: QuarterlyMetrics = {

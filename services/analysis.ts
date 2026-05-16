@@ -26,6 +26,10 @@ export async function analyzeStock(symbol: string): Promise<StockAnalysis> {
     fetchHistoricalSeries(normalized)
   ]);
 
+  if (!quote.marketCap && summary.fundamentals.marketCap > 0) {
+    quote.marketCap = summary.fundamentals.marketCap;
+  }
+
   const { technicals, history } = calculateTechnicals(historyRaw, quote.price, quote.volume);
 
   const fundamentalScore = calculateFundamentalScore(summary.fundamentals);
