@@ -140,7 +140,10 @@ export default function WatchlistPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Link
-                href={`/stocks/${encodeURIComponent(item.symbol)}`}
+                href={{
+                  pathname: "/stocks/[symbol]",
+                  query: { symbol: item.symbol }
+                }}
                 className="rounded-lg border border-border/80 bg-muted/60 px-3 py-2 text-sm text-foreground transition hover:bg-muted"
               >
                 Analyze

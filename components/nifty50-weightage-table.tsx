@@ -22,7 +22,10 @@ export function Nifty50WeightageTable() {
                 <td className="px-4 py-3 text-muted-foreground">{stock.rank}</td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/stocks/${encodeURIComponent(stock.symbol)}`}
+                    href={{
+                      pathname: "/stocks/[symbol]",
+                      query: { symbol: stock.symbol }
+                    }}
                     className="font-semibold text-primary transition hover:text-foreground"
                   >
                     {stock.symbol}

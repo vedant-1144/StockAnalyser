@@ -48,7 +48,10 @@ export function StockCard({ stock }: { stock: StockAnalysis }) {
         </div>
 
         <Link
-          href={`/stocks/${encodeURIComponent(stock.quote.symbol)}`}
+          href={{
+            pathname: "/stocks/[symbol]",
+            query: { symbol: stock.quote.symbol }
+          }}
           className="inline-flex items-center gap-1 rounded-lg bg-primary/20 px-2.5 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/30"
         >
           Analyze
