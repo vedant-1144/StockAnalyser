@@ -61,7 +61,7 @@ export async function analyzeStock(symbol: string): Promise<StockAnalysis> {
   return result;
 }
 
-export async function scanMarket(symbols = [...DEFAULT_SCAN_SYMBOLS]): Promise<MarketScan> {
+export async function scanMarket(symbols: string[] = [...DEFAULT_SCAN_SYMBOLS]): Promise<MarketScan> {
   const normalizedSymbols = symbols.map((symbol) => normalizeSymbol(symbol));
   const cacheKey = `scan:${normalizedSymbols.join(",")}`;
   const cached = appCache.get<MarketScan>(cacheKey);
